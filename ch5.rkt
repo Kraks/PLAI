@@ -1,16 +1,21 @@
 #lang plai-typed
 
-(define-type ArithC
-  [numC (n : number)]
-  [plusC (l : ArithC) (r : ArithC)]
-  [multC (l : ArithC) (r : ArithC)])
-
 (define-type ArithS
   [numS (n : number)]
   [uminusS (e : ArithS)]
   [plusS (l : ArithS) (r : ArithS)]
   [bminusS (l : ArithS) (r : ArithS)]
   [multS (l : ArithS) (r : ArithS)])
+
+(define-type FunDefC
+  [fdC (name : symbol) (arg : symbol) (body : ExprC)])
+
+(define-type ExprC
+  [numC (n : number)]
+  [idC (s : symbol)]
+  [appC (fun : symbol) (arg : ExprC)]
+  [plusC (l : ExprC) (r : ExprC)]
+  [multC (l : ExprC) (r : ExprC)])
 
 ; parser from chapter 2
 (define (parse [s : s-expression]) : ArithS
@@ -35,11 +40,13 @@
     [uminusS (e) (multC (numC -1) (desugar e))] ;another way to desugar -n
     [bminusS (l r) (plusC (desugar l) (multC (numC -1) (desugar r)))]))
 
-(define (interp [a : ArithC]) : number
-  (type-case ArithC a
+(define (interp [e : ExprC] [fds : (listof FunDefC)]) : number
+  (type-case ExprC e
     [numC (n) n]
-    [plusC (l r) (+ (interp l) (interp r))]
-    [multC (l r) (* (interp l) (interp r))]))
+    [idC (s) ]
+    [appC (func args) ]
+    [plusC (l r) (+ (interp l fds) (interp r fds))]
+    [multC (l r) (* (interp l fds) (interp r fds))]))
 
 (test (interp (desugar (parse '(+ (* 1 2) (+ 2 3))))) 7)
 (test (interp (desugar (parse '(- (+ 1 2))))) -3)
