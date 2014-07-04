@@ -31,23 +31,54 @@
          [else (error 'parse "invalid list input")]))]
     [else (error 'parse "invalid input")]))
 
-(define (desugar [as : ArithS]) : ArithC
-  (type-case ArithS as
-    [numS (n) (numC n)]
-    [plusS (l r) (plusC (desugar l) (desugar r))]
-    [multS (l r) (multC (desugar l) (desugar r))]
-    ;[uminusS (e) (desugar (bminusS (numS 0) e))]
-    [uminusS (e) (multC (numC -1) (desugar e))] ;another way to desugar -n
-    [bminusS (l r) (plusC (desugar l) (multC (numC -1) (desugar r)))]))
+; subst : ExprC * symbol * ExprC -> ExprC
+(define (subst [what : ExprC] [for : symbol] [in : ExprC]): ExprC
+  (type-case ExprC in
+    [numC (n) in]
+    [idC (s) (cond [(symbol=? s for) what]
+                   [else in])]
+    [appC (f a) (appC f (subst what for a))]
+    [plusC (l r) (plusC (subst what for l)
+                        (subst what for r))]
+    [multC (l r) (plusC (subst what for l)
+                        (subst what for r))]))
 
+; get-fundef : symbol * (listof FunDefC) -> FunDefC
+(define (get-fundef [n : symbol] [fds : (listof FunDefC)]) : FunDefC
+  (cond [(empty? fds) (error 'get-fundef "reference to undefined function")]
+        [(cons? fds) (cond
+                       [(equal? n (fdC-name (first fds))) (first fds)]
+                       [else (get-fundef n (rest fds))])]))
+
+; lazy, or call-by-name
 (define (interp [e : ExprC] [fds : (listof FunDefC)]) : number
   (type-case ExprC e
     [numC (n) n]
-    [idC (s) ]
-    [appC (func args) ]
+    [idC (_) (error 'interp "shouldn't get here")]
+    [appC (func args) (local ([define fd (get-fundef func fds)])
+                        (interp (subst args (fdC-arg fd) (fdC-body fd))
+                                fds))]
     [plusC (l r) (+ (interp l fds) (interp r fds))]
     [multC (l r) (* (interp l fds) (interp r fds))]))
 
-(test (interp (desugar (parse '(+ (* 1 2) (+ 2 3))))) 7)
-(test (interp (desugar (parse '(- (+ 1 2))))) -3)
-(test (interp (desugar (parse '(- (- (* 3 3)))))) 9)
+;; test
+(fdC 'double 'x (plusC (idC 'x) (idC 'x)))
+(fdC 'quardruple 'x (appC 'double (appC 'double (idC 'x))))
+(fdC 'cons5 '_ (numC 5))
+
+(interp (appC 'double (numC 10)) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x)))))
+
+; eager interp, or call-by-value
+(define (interp-cbv [e : ExprC] [fds : (listof FunDefC)]) : number
+  (type-case ExprC e
+    [numC (n) n]
+    [idC (_) (error 'interp "shouldn't get here")]
+    [appC (func args) (local ([define fd (get-fundef func fds)])
+                        (interp-cbv (subst (numC (interp-cbv args fds))
+                                           (fdC-arg fd)
+                                           (fdC-body fd))
+                                    fds))]
+    [plusC (l r) (+ (interp-cbv l fds) (interp-cbv r fds))]
+    [multC (l r) (* (interp-cbv l fds) (interp-cbv r fds))]))
+
+(interp-cbv (appC 'double (plusC (numC 1) (numC 2))) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x)))))
