@@ -18,6 +18,7 @@
   [multC (l : ExprC) (r : ExprC)])
 
 ; parser from chapter 2
+; parse : s-expression -> ArithS
 (define (parse [s : s-expression]) : ArithS
   (cond
     [(s-exp-number? s) (numS (s-exp->number s))]
@@ -66,7 +67,7 @@
 (fdC 'quardruple 'x (appC 'double (appC 'double (idC 'x))))
 (fdC 'cons5 '_ (numC 5))
 
-(interp (appC 'double (numC 10)) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x)))))
+(test (interp (appC 'double (numC 10)) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x))))) 20)
 
 ; eager interp, or call-by-value
 (define (interp-cbv [e : ExprC] [fds : (listof FunDefC)]) : number
@@ -81,4 +82,4 @@
     [plusC (l r) (+ (interp-cbv l fds) (interp-cbv r fds))]
     [multC (l r) (* (interp-cbv l fds) (interp-cbv r fds))]))
 
-(interp-cbv (appC 'double (plusC (numC 1) (numC 2))) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x)))))
+(test (interp-cbv (appC 'double (plusC (numC 1) (numC 2))) (list (fdC 'double 'x (plusC (idC 'x) (idC 'x))))) 6)
